@@ -3,6 +3,8 @@ import { Settings, CheckCircle, Save } from 'lucide-react';
 import { Button, Input } from '../ui';
 import { cn } from '../../lib/utils';
 import useTemplateStore from '../../store/useTemplateStore';
+import { Send } from 'lucide-react'; // Import Send icon
+import { api } from '../../lib/api';
 
 /**
  * EditorHeader Component
@@ -25,6 +27,19 @@ export const EditorHeader = () => {
       saveTemplate();
     }, 600);
   };
+
+  const handleSendTest = async () => {
+    const email = prompt("Enter recipient email:");
+    if (!email) return;
+    
+    try {
+        await api.sendEmail(activeTemplate.id, email);
+        alert("Email sent successfully!");
+    } catch (error) {
+        alert("Failed to send email.");
+        console.error(error);
+    }
+};
 
   return (
     <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shadow-sm z-10">
@@ -66,6 +81,11 @@ export const EditorHeader = () => {
           {isSaved ? <CheckCircle className="w-3 h-3" /> : <Save className="w-3 h-3" />}
           <span>{isSaved ? 'Saved' : 'Save'}</span>
         </Button>
+
+        <Button onClick={handleSendTest} size="sm" variant="secondary" className="gap-2 mr-2">
+    <Send className="w-3 h-3" />
+    <span>Send Test</span>
+</Button>
       </div>
     </div>
   );

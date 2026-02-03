@@ -29,6 +29,15 @@ export const api = {
     return response.data;
   },
 
+  // Send an email using a template
+  sendEmail: async (templateId, recipientEmail) => {
+  const response = await axios.post(`${API_URL}/email/send`, {
+    templateId,
+    recipientEmail
+  });
+  return response.data;
+},
+
   // Delete a template
   deleteTemplate: async (id) => {
     const response = await axios.delete(`${API_URL}/templates/${id}`);
