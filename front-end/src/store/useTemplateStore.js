@@ -1,148 +1,180 @@
+// Zustand store for managing email templates
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { INITIAL_TEMPLATES } from '../constants/templates';
+import { api } from '../lib/api';
+import { DEFAULT_SECTIONS } from '../constants/templates';
 
-/**
- * Zustand store for managing email templates
- */
 const useTemplateStore = create(
   devtools(
     (set, get) => ({
       // State
-      templates: INITIAL_TEMPLATES,
-      activeId: INITIAL_TEMPLATES[0].id,
-      view: 'dashboard', // 'dashboard' | 'editor'
+      templates: [],
+      activeId: null,
+      activeTemplate: null, // We now store the full active template separately
+      view: 'dashboard', 
       isSaved: true,
-      editorTab: 'structure', // 'structure' | 'settings'
+      editorTab: 'structure',
       selectedSectionId: null,
       showMockData: false,
+      isLoading: false, // UI loading state
+      error: null,
 
-      // Getters
-      getActiveTemplate: () => {
-        const state = get();
-        return state.templates.find((t) => t.id === state.activeId) || state.templates[0];
+      // --- ASYNC ACTIONS (API Calls) ---
+
+      // 1. Fetch all templates for Dashboard
+      fetchTemplates: async () => {
+        set({ isLoading: true });
+        try {
+          const data = await api.getAllTemplates();
+          set({ templates: data, isLoading: false });
+        } catch (err) {
+          console.error(err);
+          set({ error: 'Failed to load templates', isLoading: false });
+        }
       },
 
+      // 2. Load a specific template for Editor
+      loadTemplate: async (id) => {
+        set({ isLoading: true, activeId: id, view: 'editor' });
+        try {
+          const data = await api.getTemplateById(id);
+          // MySQL might return 'sections' as a string if not configured perfectly, 
+          // so we double check parsing here just in case.
+          if (typeof data.sections === 'string') {
+             data.sections = JSON.parse(data.sections);
+          }
+          set({ activeTemplate: data, isLoading: false, isSaved: true });
+        } catch (err) {
+          console.error(err);
+          set({ error: 'Failed to load template', isLoading: false });
+        }
+      },
+
+      // 3. Create new template
+      createNewTemplate: async () => {
+        set({ isLoading: true });
+        try {
+          const newTemplate = {
+            user_id: 1, // Hardcoded for now
+            name: 'Untitled Template',
+            category: 'Other',
+            subject: 'New Subject',
+            sections: DEFAULT_SECTIONS,
+          };
+          
+          const result = await api.createTemplate(newTemplate);
+          
+          // Refresh list and open editor
+          await get().fetchTemplates();
+          await get().loadTemplate(result.id);
+        } catch (err) {
+          set({ error: 'Failed to create template', isLoading: false });
+        }
+      },
+
+      // 4. Save the current template to DB
+      saveTemplate: async () => {
+        const { activeTemplate } = get();
+        if (!activeTemplate) return;
+
+        set({ isSaved: false }); // Show saving spinner if you have one
+        try {
+          await api.updateTemplate(activeTemplate.id, {
+            name: activeTemplate.name,
+            category: activeTemplate.category,
+            subject: activeTemplate.subject,
+            sections: activeTemplate.sections,
+          });
+          set({ isSaved: true });
+        } catch (err) {
+          console.error(err);
+          set({ error: 'Failed to save', isSaved: false });
+        }
+      },
+
+      // --- LOCAL STATE ACTIONS (Editor manipulations) ---
+      
+      setView: (view) => set({ view }),
+      
+      setEditorTab: (tab) => set({ editorTab: tab }),
+      
+      setSelectedSectionId: (id) => set({ selectedSectionId: id }),
+      
+      toggleMockData: () => set((state) => ({ showMockData: !state.showMockData })),
+
+      // Helper to get active template (now returns the state variable)
+      getActiveTemplate: () => get().activeTemplate,
+
+      // Helper to get active section
       getActiveSection: () => {
         const state = get();
-        const template = state.getActiveTemplate();
-        return state.selectedSectionId
-          ? template?.sections.find((s) => s.id === state.selectedSectionId)
+        return state.selectedSectionId && state.activeTemplate
+          ? state.activeTemplate.sections.find((s) => s.id === state.selectedSectionId)
           : null;
       },
 
-      // Actions
-      setActiveId: (id) => set({ activeId: id }),
-
-      setView: (view) => set({ view }),
-
-      setEditorTab: (tab) => set({ editorTab: tab }),
-
-      setSelectedSectionId: (id) => set({ selectedSectionId: id }),
-
-      toggleMockData: () => set((state) => ({ showMockData: !state.showMockData })),
-
+      // Local Update: Name/Subject (Wait for save button to persist)
       updateTemplateInfo: (key, value) =>
         set((state) => ({
-          templates: state.templates.map((t) =>
-            t.id === state.activeId ? { ...t, [key]: value, lastModified: 'Just now' } : t
-          ),
+          activeTemplate: { ...state.activeTemplate, [key]: value },
           isSaved: false,
         })),
 
+      // Local Update: Add Section
       addSection: (newSection) =>
         set((state) => {
-          const template = state.getActiveTemplate();
-          const updatedSections = [...template.sections, newSection];
+          if (!state.activeTemplate) return {};
           return {
-            templates: state.templates.map((t) =>
-              t.id === state.activeId
-                ? { ...t, sections: updatedSections, lastModified: 'Just now' }
-                : t
-            ),
+            activeTemplate: {
+              ...state.activeTemplate,
+              sections: [...state.activeTemplate.sections, newSection],
+            },
             selectedSectionId: newSection.id,
             editorTab: 'settings',
             isSaved: false,
           };
         }),
 
+      // Local Update: Modify Section
       updateSection: (id, field, key, value) =>
         set((state) => {
-          const template = state.getActiveTemplate();
-          const updatedSections = template.sections.map((s) => {
+            const sections = state.activeTemplate.sections.map((s) => {
             if (s.id !== id) return s;
             return { ...s, [field]: { ...s[field], [key]: value } };
-          });
-          return {
-            templates: state.templates.map((t) =>
-              t.id === state.activeId
-                ? { ...t, sections: updatedSections, lastModified: 'Just now' }
-                : t
-            ),
-            isSaved: false,
-          };
+            });
+            return {
+                activeTemplate: { ...state.activeTemplate, sections },
+                isSaved: false,
+            };
         }),
 
+      // Local Update: Delete Section
       deleteSection: (id) =>
-        set((state) => {
-          const template = state.getActiveTemplate();
-          const updatedSections = template.sections.filter((s) => s.id !== id);
-          return {
-            templates: state.templates.map((t) =>
-              t.id === state.activeId
-                ? { ...t, sections: updatedSections, lastModified: 'Just now' }
-                : t
-            ),
-            selectedSectionId: state.selectedSectionId === id ? null : state.selectedSectionId,
-            isSaved: false,
-          };
-        }),
+        set((state) => ({
+          activeTemplate: {
+            ...state.activeTemplate,
+            sections: state.activeTemplate.sections.filter((s) => s.id !== id),
+          },
+          selectedSectionId: state.selectedSectionId === id ? null : state.selectedSectionId,
+          isSaved: false,
+        })),
 
+      // Local Update: Move Section
       moveSection: (index, direction) =>
         set((state) => {
-          const template = state.getActiveTemplate();
-          if (direction === -1 && index === 0) return state;
-          if (direction === 1 && index === template.sections.length - 1) return state;
+          const sections = [...state.activeTemplate.sections];
+          if (direction === -1 && index === 0) return {};
+          if (direction === 1 && index === sections.length - 1) return {};
 
-          const newSections = [...template.sections];
-          const temp = newSections[index];
-          newSections[index] = newSections[index + direction];
-          newSections[index + direction] = temp;
+          const temp = sections[index];
+          sections[index] = sections[index + direction];
+          sections[index + direction] = temp;
 
           return {
-            templates: state.templates.map((t) =>
-              t.id === state.activeId
-                ? { ...t, sections: newSections, lastModified: 'Just now' }
-                : t
-            ),
+            activeTemplate: { ...state.activeTemplate, sections },
             isSaved: false,
           };
         }),
-
-      createNewTemplate: () =>
-        set((state) => {
-          const newId = `t${Date.now()}`;
-          const newTemplate = {
-            id: newId,
-            name: 'Untitled Template',
-            category: 'Other',
-            subject: '',
-            lastModified: 'Just now',
-            sections: [],
-          };
-          return {
-            templates: [...state.templates, newTemplate],
-            activeId: newId,
-            view: 'editor',
-            editorTab: 'structure',
-            isSaved: false,
-          };
-        }),
-
-      saveTemplate: () =>
-        set(() => ({
-          isSaved: true,
-        })),
     }),
     { name: 'TemplateStore' }
   )
