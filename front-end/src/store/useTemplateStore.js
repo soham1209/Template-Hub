@@ -91,6 +91,18 @@ const useTemplateStore = create(
           set({ error: 'Failed to save', isSaved: false });
         }
       },
+      // 5 Reorder sections via drag-and-drop
+      reorderSection: (fromIndex, toIndex) =>
+        set((state) => {
+          const sections = [...state.activeTemplate.sections];
+          const [movedItem] = sections.splice(fromIndex, 1);
+          sections.splice(toIndex, 0, movedItem);
+
+          return {
+            activeTemplate: { ...state.activeTemplate, sections },
+            isSaved: false,
+          };
+        }),
 
       // --- LOCAL STATE ACTIONS (Editor manipulations) ---
       

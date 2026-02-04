@@ -1,12 +1,12 @@
-import React from 'react';
-import { GripVertical, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { GripVertical, Trash2, Eye } from 'lucide-react';
 import { Button } from '../ui';
 import { cn } from '../../lib/utils';
 import useTemplateStore from '../../store/useTemplateStore';
 
 /**
  * LayersList Component
- * Displays all sections in the template with reordering controls
+ * Displays all sections with Drag-and-Drop reordering
  */
 export const LayersList = () => {
   const {
@@ -15,10 +15,14 @@ export const LayersList = () => {
     setSelectedSectionId,
     setEditorTab,
     deleteSection,
-    moveSection,
+    reorderSection,
   } = useTemplateStore();
 
   const activeTemplate = getActiveTemplate();
+  
+  // State to track the item currently being dragged
+  const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+  const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
   const handleLayerClick = (id) => {
     setSelectedSectionId(id);
@@ -30,9 +34,39 @@ export const LayersList = () => {
     deleteSection(id);
   };
 
-  const handleMove = (e, index, direction) => {
-    e.stopPropagation();
-    moveSection(index, direction);
+  // --- DRAG AND DROP HANDLERS ---
+
+  const onDragStart = (e, index) => {
+    setDraggedItemIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    // Removed the setDragImage line. 
+    // Default browser behavior will now correctly show just the row being moved.
+  };
+
+  const onDragOver = (e, index) => {
+    e.preventDefault(); // Necessary to allow dropping
+    if (draggedItemIndex === null) return;
+    if (dragOverItemIndex !== index) {
+      setDragOverItemIndex(index);
+    }
+  };
+
+  const onDragEnd = () => {
+    setDraggedItemIndex(null);
+    setDragOverItemIndex(null);
+  };
+
+  const onDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedItemIndex === null) return;
+
+    // Perform the reorder in the store
+    if (draggedItemIndex !== dropIndex) {
+      reorderSection(draggedItemIndex, dropIndex);
+    }
+    
+    setDraggedItemIndex(null);
+    setDragOverItemIndex(null);
   };
 
   return (
@@ -44,50 +78,69 @@ export const LayersList = () => {
         {activeTemplate?.sections.map((section, idx) => (
           <div
             key={section.id}
+            draggable
+            onDragStart={(e) => onDragStart(e, idx)}
+            onDragOver={(e) => onDragOver(e, idx)}
+            onDrop={(e) => onDrop(e, idx)}
+            onDragEnd={onDragEnd}
             onClick={() => handleLayerClick(section.id)}
             className={cn(
-              'group flex items-center justify-between p-3 rounded-md border cursor-pointer transition-all',
+              'group flex items-center justify-between p-3 rounded-md border cursor-pointer transition-all duration-200 select-none relative',
+              // Active State
               selectedSectionId === section.id
-                ? 'border-slate-900 bg-slate-50 shadow-sm'
-                : 'border-slate-100 bg-white hover:border-slate-300'
+                ? 'border-indigo-600 bg-indigo-50 shadow-sm z-10'
+                : 'border-slate-200 bg-white hover:border-slate-300',
+              // Dragging State: Only fade the original, don't mess with borders too much
+              draggedItemIndex === idx && 'opacity-30',
+              // Drop Target Visual: Add a blue line to show where it will land
+              dragOverItemIndex === idx && draggedItemIndex !== idx && (
+                idx > draggedItemIndex ? 'border-b-2 border-b-indigo-500' : 'border-t-2 border-t-indigo-500'
+              )
             )}
           >
-            <div className="flex items-center gap-3">
-              <GripVertical className="w-4 h-4 text-slate-300 cursor-move" />
-              <span className="text-sm font-medium capitalize text-slate-700">
-                {section.type}
-              </span>
+            <div className="flex items-center gap-3 overflow-hidden">
+              {/* Drag Handle */}
+              <div className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-300 hover:text-slate-600 rounded">
+                <GripVertical className="w-4 h-4" />
+              </div>
+              
+              <div className="flex flex-col truncate">
+                <span className="text-sm font-medium capitalize text-slate-700 truncate">
+                  {section.type} Block
+                </span>
+                {/* REMOVED THE ID TEXT HERE */}
+              </div>
             </div>
+
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button
+               {/* View/Edit Trigger */}
+               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
-                onClick={(e) => handleMove(e, idx, -1)}
+                className="h-7 w-7 text-slate-400 hover:text-indigo-600"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleLayerClick(section.id);
+                }}
               >
-                <ArrowUp className="w-3 h-3 text-slate-500" />
+                <Eye className="w-3.5 h-3.5" />
               </Button>
+
+              {/* Delete Trigger */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
-                onClick={(e) => handleMove(e, idx, 1)}
-              >
-                <ArrowDown className="w-3 h-3 text-slate-500" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 hover:bg-red-50 hover:text-red-600"
+                className="h-7 w-7 text-slate-400 hover:bg-red-50 hover:text-red-600"
                 onClick={(e) => handleDelete(e, section.id)}
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
         ))}
+
         {(!activeTemplate?.sections || activeTemplate.sections.length === 0) && (
-          <div className="text-center text-sm text-slate-400 py-8 border border-dashed border-slate-200 rounded-lg bg-slate-50/50">
+          <div className="text-center text-sm text-slate-400 py-8 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
             No blocks added yet.
           </div>
         )}
