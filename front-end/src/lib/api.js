@@ -63,6 +63,15 @@ export const api = {
     return res.json();
   },
   
+  // Get all categories
+  getCategories: async () => {
+    const res = await fetch(`${API_URL}/templates/categories`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch categories');
+    return res.json();
+  },
+
   // Delete Template
   deleteTemplate: async (id) => {
     const res = await fetch(`${API_URL}/templates/${id}`, {

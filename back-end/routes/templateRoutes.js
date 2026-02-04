@@ -1,3 +1,4 @@
+// back-end/routes/templateRoutes.js
 const express = require('express');
 const router = express.Router();
 const { 
@@ -5,13 +6,19 @@ const {
   getTemplate, 
   createTemplate, 
   updateTemplate, 
-  deleteTemplate 
+  deleteTemplate,
+  getAllCategories 
 } = require('../controllers/templateController');
 
-router.get('/', getTemplates);
-router.get('/:id', getTemplate);
-router.post('/', createTemplate);
-router.put('/:id', updateTemplate);
-router.delete('/:id', deleteTemplate);
+const { protect } = require('../middleware/authMiddleware');
+
+router.get('/', protect, getTemplates);
+router.post('/', protect, createTemplate);
+
+router.get('/categories', protect, getAllCategories); 
+
+router.get('/:id', protect, getTemplate);
+router.put('/:id', protect, updateTemplate);
+router.delete('/:id', protect, deleteTemplate);
 
 module.exports = router;

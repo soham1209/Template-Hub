@@ -1,14 +1,13 @@
 const db = require('../config/db');
 
-// @desc    Get all templates for a specific user
-// @route   GET /api/templates?userId=1
+// @desc    Get ALL templates (Public Mode - Everyone sees everything)
+// @route   GET /api/templates
 exports.getTemplates = async (req, res) => {
   try {
-    const userId = req.query.userId || 1; // Default to ID 1 for testing
-    
+    // REMOVED 'WHERE user_id = ?'
+    // Now selecting all templates from the database
     const [rows] = await db.query(
-      'SELECT id, name, category, subject, updated_at FROM templates WHERE user_id = ? ORDER BY updated_at DESC', 
-      [userId]
+      'SELECT id, name, category, subject, updated_at, user_id FROM templates ORDER BY updated_at DESC'
     );
     
     res.status(200).json(rows);
@@ -40,13 +39,16 @@ exports.getTemplate = async (req, res) => {
 // @route   POST /api/templates
 exports.createTemplate = async (req, res) => {
   try {
-    const { user_id, name, category, subject, sections } = req.body;
+    const { name, category, subject, sections } = req.body;
+    
+    // Use the logged-in user's ID if available, otherwise default to 1
+    const userId = req.user ? req.user.id : 1;
     
     const sectionsJson = JSON.stringify(sections || []); 
 
     const [result] = await db.query(
       'INSERT INTO templates (user_id, name, category, subject, sections) VALUES (?, ?, ?, ?, ?)',
-      [user_id || 1, name, category, subject, sectionsJson]
+      [userId, name, category, subject, sectionsJson]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Template created' });
@@ -85,6 +87,29 @@ exports.deleteTemplate = async (req, res) => {
     res.status(200).json({ message: 'Template deleted' });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Get ALL unique categories (Global Search)
+// @route   GET /api/templates/categories
+exports.getAllCategories = async (req, res) => {
+  try {
+    console.log("🔍 Fetching ALL categories (Global Mode)");
+
+    // REMOVED 'WHERE user_id = ?'
+    // Now searching the entire table for unique categories
+    const [rows] = await db.query(
+      'SELECT DISTINCT category FROM templates WHERE category IS NOT NULL AND category != ""'
+    );
+    
+    const categories = rows.map(row => row.category);
+    
+    console.log("✅ Found global categories:", categories);
+    
+    res.status(200).json(categories);
+  } catch (error) {
+    console.error("❌ Error fetching categories:", error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
