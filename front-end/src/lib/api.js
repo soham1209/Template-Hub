@@ -1,46 +1,75 @@
 // front-end/src/lib/api.js
-import axios from 'axios';
-
-// Ensure this matches your backend port
 const API_URL = 'http://localhost:5000/api';
 
+// Helper to get token from storage
+const getHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    // Attach the token if it exists
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 export const api = {
-  // Get all templates for the dashboard
-  getAllTemplates: async (userId = 1) => {
-    const response = await axios.get(`${API_URL}/templates?userId=${userId}`);
-    return response.data;
+  // Get all templates for the logged-in user
+  getTemplates: async () => {
+    const res = await fetch(`${API_URL}/templates`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch templates');
+    return res.json();
   },
 
-  // Get a single full template
-  getTemplateById: async (id) => {
-    const response = await axios.get(`${API_URL}/templates/${id}`);
-    return response.data;
+  // Get a single template
+  getTemplate: async (id) => {
+    const res = await fetch(`${API_URL}/templates/${id}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch template');
+    return res.json();
   },
 
   // Create a new template
   createTemplate: async (templateData) => {
-    const response = await axios.post(`${API_URL}/templates`, templateData);
-    return response.data;
+    const res = await fetch(`${API_URL}/templates`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(templateData),
+    });
+    if (!res.ok) throw new Error('Failed to create template');
+    return res.json();
   },
 
   // Save/Update a template
-  updateTemplate: async (id, templateData) => {
-    const response = await axios.put(`${API_URL}/templates/${id}`, templateData);
-    return response.data;
+  saveTemplate: async (id, data) => {
+    const res = await fetch(`${API_URL}/templates/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to save template');
+    return res.json();
   },
 
-  // Send an email using a template
-  sendEmail: async (templateId, recipientEmail) => {
-  const response = await axios.post(`${API_URL}/email/send`, {
-    templateId,
-    recipientEmail
-  });
-  return response.data;
-},
-
-  // Delete a template
+  // Send Test Email
+  sendEmail: async (id, recipient) => {
+    const res = await fetch(`${API_URL}/email/send`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ templateId: id, recipient }),
+    });
+    if (!res.ok) throw new Error('Failed to send email');
+    return res.json();
+  },
+  
+  // Delete Template
   deleteTemplate: async (id) => {
-    const response = await axios.delete(`${API_URL}/templates/${id}`);
-    return response.data;
+    const res = await fetch(`${API_URL}/templates/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to delete template');
+    return res.json();
   }
 };

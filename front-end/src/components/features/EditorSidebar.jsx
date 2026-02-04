@@ -10,16 +10,25 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import useTemplateStore from '../../store/useTemplateStore';
-import { MOCK_USER_CONTEXT } from '../../constants/templates';
+import useAuthStore from '../../store/useAuthStore'; // <--- 1. Import Auth Store
 
 export const EditorSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { editorTab, setEditorTab } = useTemplateStore();
+  
+  // 2. Get logout function and user data
+  const { logout, user } = useAuthStore(); 
+  
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Determine if we are in the editor view based on URL
   const isEditorView = location.pathname.includes('/editor');
+
+  // 3. Handle Logout Logic
+  const handleLogout = () => {
+    logout(); // Clears token from store & local storage
+    navigate('/login'); // Force redirect to login page
+  };
 
   const NavItem = ({ icon: Icon, label, isActive, onClick }) => (
     <button
@@ -55,6 +64,7 @@ export const EditorSidebar = () => {
         isExpanded ? "w-64 px-4" : "w-[70px] px-2"
       )}
     >
+      {/* Toggle Button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="absolute -right-3 top-9 bg-indigo-600 text-white p-1 rounded-full shadow-lg border-2 border-slate-50 hover:bg-indigo-700 transition-colors z-50"
@@ -62,18 +72,19 @@ export const EditorSidebar = () => {
         {isExpanded ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
       </button>
 
+      {/* Header / Logo */}
       <div className={cn("flex items-center h-20 mb-2 transition-all duration-300", isExpanded ? "justify-start px-2" : "justify-center")}>
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
            <span className="font-bold text-white text-xs">MF</span>
         </div>
         <div className={cn("ml-3 overflow-hidden transition-all duration-300", isExpanded ? "w-auto opacity-100" : "w-0 opacity-0")}>
            <h1 className="font-bold text-white tracking-tight">MailForge</h1>
+           <p className="text-[10px] text-slate-500">v1.0.0</p>
         </div>
       </div>
 
+      {/* Nav Items */}
       <div className="flex-1 flex flex-col gap-1">
-        
-        {/* Dashboard Link - Goes to Root */}
         <NavItem 
           icon={Mail} 
           label="Dashboard" 
@@ -83,7 +94,6 @@ export const EditorSidebar = () => {
 
         <div className="w-full h-[1px] bg-slate-800/50 my-2"></div>
 
-        {/* Structure Link - Only active in Editor */}
         <NavItem 
           icon={LayoutList} 
           label="Structure" 
@@ -93,7 +103,6 @@ export const EditorSidebar = () => {
           }} 
         />
 
-        {/* Properties Link - Only active in Editor */}
         <NavItem 
           icon={Settings} 
           label="Properties" 
@@ -104,20 +113,29 @@ export const EditorSidebar = () => {
         />
       </div>
 
+      {/* Footer / User Profile */}
       <div className={cn(
         "mt-auto mb-6 bg-slate-900/50 rounded-xl border border-slate-800 transition-all duration-300 flex items-center overflow-hidden",
         isExpanded ? "p-3 mx-0" : "p-0 mx-0 border-none bg-transparent justify-center"
       )}>
         <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs text-slate-300 font-bold flex-shrink-0">
-          {MOCK_USER_CONTEXT.name[0]}
+          {user?.name ? user.name[0] : 'U'} {/* Use Real Initial */}
         </div>
         
         <div className={cn("ml-3 overflow-hidden transition-all duration-300", isExpanded ? "w-auto opacity-100" : "w-0 opacity-0")}>
-           <p className="text-xs font-medium text-slate-200 truncate">{MOCK_USER_CONTEXT.name}</p>
+           <p className="text-xs font-medium text-slate-200 truncate">
+             {user?.name || 'User'} {/* Use Real Name */}
+           </p>
+           <p className="text-[10px] text-slate-500 truncate">Free Plan</p>
         </div>
 
         {isExpanded && (
-          <button className="ml-auto text-slate-500 hover:text-red-400 transition-colors">
+          // 4. Attach onClick to the Logout Button
+          <button 
+            onClick={handleLogout}
+            className="ml-auto text-slate-500 hover:text-red-400 transition-colors p-1"
+            title="Sign out"
+          >
             <LogOut className="w-4 h-4" />
           </button>
         )}

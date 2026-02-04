@@ -25,7 +25,7 @@ const useTemplateStore = create(
       fetchTemplates: async () => {
         set({ isLoading: true });
         try {
-          const data = await api.getAllTemplates();
+          const data = await api.getTemplates();
           set({ templates: data, isLoading: false });
         } catch (err) {
           console.error(err);
@@ -37,7 +37,7 @@ const useTemplateStore = create(
       loadTemplate: async (id) => {
         set({ isLoading: true, activeId: id, view: 'editor' });
         try {
-          const data = await api.getTemplateById(id);
+          const data = await api.getTemplate(id);
           // MySQL might return 'sections' as a string if not configured perfectly, 
           // so we double check parsing here just in case.
           if (typeof data.sections === 'string') {
@@ -79,7 +79,7 @@ const useTemplateStore = create(
 
         set({ isSaved: false }); // Show saving spinner if you have one
         try {
-          await api.updateTemplate(activeTemplate.id, {
+          await api.saveTemplate(activeTemplate.id, {
             name: activeTemplate.name,
             category: activeTemplate.category,
             subject: activeTemplate.subject,
