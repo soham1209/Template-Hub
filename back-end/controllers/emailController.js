@@ -1,7 +1,7 @@
 // backend/controllers/emailController.js
-const nodemailer = require('nodemailer');
-const db = require('../config/db');
-const generateHTML = require('../utils/emailGenerator');
+import nodemailer from 'nodemailer';
+import db from '../config/db.js';
+import generateHTML from '../utils/emailGenerator.js';
 
 // Configure the transporter (The "Postman")
 const transporter = nodemailer.createTransport({
@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-exports.sendEmail = async (req, res) => {
+export const sendEmail = async (req, res) => {
   // Extract 'recipient' (matches frontend)
   const { templateId, recipient, contextData } = req.body;
 
@@ -71,7 +71,7 @@ exports.sendEmail = async (req, res) => {
     // 4. Send the email
     const info = await transporter.sendMail(mailOptions);
 
-    console.log('✅ Message sent: %s', info.messageId);
+    // console.log('✅ Message sent: %s', info.messageId);
     res.status(200).json({ message: 'Email sent successfully!', messageId: info.messageId });
 
   } catch (error) {

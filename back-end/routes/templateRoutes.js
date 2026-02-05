@@ -1,16 +1,16 @@
 // back-end/routes/templateRoutes.js
-const express = require('express');
-const router = express.Router();
-const { 
+import express from 'express';
+import { 
   getTemplates, 
   getTemplate, 
   createTemplate, 
   updateTemplate, 
   deleteTemplate,
   getAllCategories 
-} = require('../controllers/templateController');
+} from '../controllers/templateController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
-const { protect } = require('../middleware/authMiddleware');
+const router = express.Router();
 
 router.get('/', protect, getTemplates);
 router.post('/', protect, createTemplate);
@@ -21,4 +21,4 @@ router.get('/:id', protect, getTemplate);
 router.put('/:id', protect, updateTemplate);
 router.delete('/:id', protect, deleteTemplate);
 
-module.exports = router;
+export default router;

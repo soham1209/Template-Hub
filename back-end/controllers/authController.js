@@ -1,13 +1,13 @@
-const db = require('../config/db');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import db from '../config/db.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
 };
 
 // REGISTER
-exports.registerUser = async (req, res) => {
+export const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
@@ -41,7 +41,7 @@ exports.registerUser = async (req, res) => {
 };
 
 // LOGIN
-exports.loginUser = async (req, res) => {
+export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {

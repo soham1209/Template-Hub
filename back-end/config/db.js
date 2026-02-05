@@ -1,5 +1,5 @@
-const mysql = require('mysql2');
-const dotenv = require('dotenv');
+import mysql from 'mysql2';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -14,4 +14,4 @@ const pool = mysql.createPool({
 });
 
 // Export promise-based pool for cleaner async/await code
-module.exports = pool.promise();
+export default pool.promise();

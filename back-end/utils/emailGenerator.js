@@ -80,4 +80,4 @@ const generateHTML = (sections, context = {}) => {
   `;
 };
 
-module.exports = generateHTML;
+export default generateHTML;

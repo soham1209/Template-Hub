@@ -1,6 +1,6 @@
 // back-end/middleware/authMiddleware.js
-const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+import jwt from 'jsonwebtoken';
+import db from '../config/db.js';
 
 const protect = async (req, res, next) => {
   let token;
@@ -43,4 +43,4 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+export { protect };

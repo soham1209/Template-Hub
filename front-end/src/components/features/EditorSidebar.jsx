@@ -79,7 +79,6 @@ export const EditorSidebar = () => {
         </div>
         <div className={cn("ml-3 overflow-hidden transition-all duration-300", isExpanded ? "w-auto opacity-100" : "w-0 opacity-0")}>
            <h1 className="font-bold text-white tracking-tight">MailForge</h1>
-           <p className="text-[10px] text-slate-500">v1.0.0</p>
         </div>
       </div>
 
@@ -126,7 +125,6 @@ export const EditorSidebar = () => {
            <p className="text-xs font-medium text-slate-200 truncate">
              {user?.name || 'User'} {/* Use Real Name */}
            </p>
-           <p className="text-[10px] text-slate-500 truncate">Free Plan</p>
         </div>
 
         {isExpanded && (
