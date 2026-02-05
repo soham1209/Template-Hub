@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Settings, CheckCircle, Save, Send, X, Loader2, Mail, ArrowLeft, Pencil, Check, Copy, Globe, Lock, Eye
+  Settings, Save, Send, X, Loader2, Mail, ArrowLeft, Copy, Globe, Lock, ChevronDown, CheckCircle, Pencil, Check 
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button, Input } from '../ui';
@@ -9,246 +9,249 @@ import useTemplateStore from '../../store/useTemplateStore';
 import useAuthStore from '../../store/useAuthStore';
 import { api } from '../../lib/api';
 
-export const EditorHeader = () => {
-  const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const {
-    getActiveTemplate,
-    updateTemplateInfo,
-    isSaved,
-    saveTemplate,
-    showMockData,
-    toggleMockData,
-  } = useTemplateStore();
-
-  const activeTemplate = getActiveTemplate();
-  
-  // Ownership Check
-  const isOwner = !activeTemplate?.user_id || activeTemplate?.user_id === user?.id;
-  const isForking = activeTemplate?.is_public && !isOwner;
-
-  // Category Logic
-  const DEFAULT_CATEGORIES = ['Marketing', 'Newsletter', 'Transactional', 'Holiday', 'Other'];
-  const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
+// --- SUB-COMPONENT 1: MINIMAL CATEGORY EDIT ---
+// This handles switching between "Dropdown" and "Type your own"
+const CategorySelector = ({ value, onChange, isOwner }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [options, setOptions] = useState(['Marketing', 'Newsletter', 'Transactional']);
   const inputRef = useRef(null);
 
+  // Load categories from DB
   useEffect(() => {
-    const loadData = async () => {
-      let merged = [...DEFAULT_CATEGORIES];
+    const load = async () => {
       try {
-        const dbCategories = await api.getCategories();
-        merged = [...merged, ...dbCategories];
+        const dbCats = await api.getCategories();
+        // Combine DB categories + Current Value + Defaults -> Remove Duplicates -> Sort
+        setOptions(prev => Array.from(new Set([...prev, ...dbCats, value || ''])).sort());
       } catch (e) {}
-      if (activeTemplate?.category) {
-        merged.push(activeTemplate.category);
-      }
-      setCategoryOptions(Array.from(new Set(merged)).sort());
     };
-    loadData();
-  }, [activeTemplate?.id]);
+    load();
+  }, [value]);
 
-  const handleSelectChange = (e) => updateTemplateInfo('category', e.target.value);
-  
-  const startEditing = () => {
-    setIsEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
-  };
-
-  const finishEditing = () => {
-    const val = activeTemplate?.category?.trim();
-    if (!val) updateTemplateInfo('category', 'Other');
-    else setCategoryOptions(prev => Array.from(new Set([...prev, val])).sort());
+  const saveCustomCategory = () => {
+    const val = value?.trim();
+    if (val) setOptions(prev => Array.from(new Set([...prev, val])).sort());
     setIsEditing(false);
   };
 
-  const handleInputKeyDown = (e) => { if (e.key === 'Enter') finishEditing(); };
-
-  // --- VISIBILITY TOGGLE (New Feature) ---
-  const toggleVisibility = () => {
-    const currentStatus = activeTemplate?.is_public ? 1 : 0;
-    const newStatus = currentStatus === 1 ? 0 : 1; // Flip it
-    updateTemplateInfo('is_public', newStatus);
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') saveCustomCategory();
   };
 
-  // Save & Fork Logic
+  // MODE A: Typing a new category
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 bg-indigo-50 px-1 rounded animate-in fade-in zoom-in duration-200">
+        <input 
+          ref={(el) => el?.focus()}
+          type="text" 
+          className="bg-transparent border-none text-xs font-medium text-indigo-700 p-0 w-24 focus:ring-0 placeholder:text-indigo-300"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={saveCustomCategory}
+        />
+        <button onMouseDown={(e) => { e.preventDefault(); saveCustomCategory(); }} className="text-emerald-600 hover:text-emerald-700">
+          <Check className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
+
+  // MODE B: Dropdown Selection
+  return (
+    <div className="relative group flex items-center gap-1">
+      <div className="relative">
+        <select
+          value={value || 'Other'}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={!isOwner}
+          className="appearance-none bg-transparent hover:text-indigo-600 transition-colors cursor-pointer pr-4 outline-none disabled:cursor-default text-xs font-medium text-slate-500"
+        >
+          {options.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {isOwner && <ChevronDown className="w-3 h-3 absolute right-0 top-0.5 pointer-events-none text-slate-400" />}
+      </div>
+
+      {/* The Pencil Button You Requested */}
+      {isOwner && (
+        <button 
+          onClick={() => setIsEditing(true)} 
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded"
+          title="Type a custom category"
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+// --- SUB-COMPONENT 2: VISIBILITY TOGGLE ---
+const VisibilityToggle = ({ isPublic, isOwner, onToggle }) => {
+  if (!isOwner) return <div className="text-xs text-indigo-500 font-medium bg-indigo-50 px-2 py-0.5 rounded flex items-center gap-1"><Globe className="w-3 h-3" /> Community</div>;
+
+  return (
+    <button 
+      onClick={onToggle}
+      className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-100"
+      title={isPublic ? "Public: Click to make Private" : "Private: Click to make Public"}
+    >
+      {isPublic ? <Globe className="w-3 h-3 text-emerald-500" /> : <Lock className="w-3 h-3" />}
+      {isPublic ? "Public" : "Private"}
+    </button>
+  );
+};
+
+// --- SUB-COMPONENT 3: SEND MODAL ---
+const SendTestModal = ({ isOpen, onClose, templateId }) => {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('idle');
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus('sending');
+    try {
+      await api.sendEmail(templateId, email);
+      setStatus('success');
+      setTimeout(onClose, 2000);
+    } catch (error) { setStatus('error'); }
+  };
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-200">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Mail className="w-4 h-4 text-indigo-500" /> Send Test Email</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-6">
+          {status === 'success' ? (
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full mb-3 flex items-center justify-center"><CheckCircle className="w-6 h-6" /></div>
+              <h4 className="text-lg font-medium text-slate-900">Email Sent!</h4>
+            </div>
+          ) : (
+            <form onSubmit={handleSend} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Recipient Address</label>
+                <Input placeholder="name@example.com" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full" autoFocus />
+              </div>
+              <div className="pt-2 flex gap-3">
+                <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+                <Button type="submit" className="flex-1 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={status === 'sending' || !email}>
+                    {status === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN COMPONENT ---
+export const EditorHeader = () => {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { getActiveTemplate, updateTemplateInfo, isSaved, saveTemplate, showMockData, toggleMockData } = useTemplateStore();
+  const activeTemplate = getActiveTemplate();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [testEmail, setTestEmail] = useState('');
-  const [sendingStatus, setSendingStatus] = useState('idle');
   const [isSaving, setIsSaving] = useState(false);
+
+  const isOwner = !activeTemplate?.user_id || activeTemplate?.user_id === user?.id;
+  const isForking = activeTemplate?.is_public && !isOwner;
 
   const handleSave = async () => {
     setIsSaving(true);
     const result = await saveTemplate();
     setIsSaving(false);
-    if (result && result.newId) navigate(`/editor/${result.newId}`);
-  };
-
-  const openSendModal = () => { setSendingStatus('idle'); setTestEmail(''); setIsModalOpen(true); };
-
-  const handleSendTest = async (e) => {
-    e.preventDefault();
-    if (!testEmail) return;
-    setSendingStatus('sending');
-    try {
-      await api.sendEmail(activeTemplate.id, testEmail);
-      setSendingStatus('success');
-      setTimeout(() => { setIsModalOpen(false); }, 2000);
-    } catch (error) { setSendingStatus('error'); }
+    if (result?.newId) navigate(`/editor/${result.newId}`);
   };
 
   return (
     <>
-      <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 shadow-sm z-30 sticky top-0">
-        <div className="flex items-center gap-4 flex-1">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                <ArrowLeft className="w-5 h-5 text-slate-500" />
-            </Button>
+      <div className="h-[72px] bg-white border-b border-slate-200 flex items-center justify-between px-4 shadow-sm z-30 sticky top-0">
+        
+        {/* LEFT: BACK + INFO */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-slate-400 hover:text-slate-600">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
 
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={activeTemplate?.name || ''}
-                        onChange={(e) => updateTemplateInfo('name', e.target.value)}
-                        className="font-semibold text-slate-900 border-none bg-transparent shadow-none px-0 h-6 focus-visible:ring-0 text-sm w-64 placeholder:text-slate-400"
-                        placeholder="Untitled Template"
-                        disabled={!isOwner} // Disable renaming if not owner
-                    />
-                    
-                    {/* VISIBILITY BADGE / TOGGLE */}
-                    {isOwner ? (
-                        <button 
-                            onClick={toggleVisibility}
-                            className={cn(
-                                "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border transition-all hover:bg-opacity-80",
-                                activeTemplate?.is_public 
-                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" 
-                                    : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
-                            )}
-                            title={activeTemplate?.is_public ? "Click to make Private" : "Click to make Public"}
-                        >
-                            {activeTemplate?.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                            {activeTemplate?.is_public ? "Public" : "Private"}
-                        </button>
-                    ) : (
-                        // View Only Badge
-                        <span className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-indigo-100">
-                            <Eye className="w-3 h-3" /> Community View
-                        </span>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2 h-6">
-                    {/* Category Selection */}
-                    {isEditing ? (
-                        <div className="flex items-center bg-indigo-50 border border-indigo-200 rounded px-1 animate-in fade-in zoom-in duration-200">
-                            <input 
-                                ref={inputRef}
-                                type="text" 
-                                className="bg-transparent border-none text-[10px] uppercase font-bold text-indigo-700 p-1 w-32 focus:ring-0 placeholder:text-indigo-300"
-                                value={activeTemplate?.category || ''}
-                                onChange={(e) => updateTemplateInfo('category', e.target.value)}
-                                onKeyDown={handleInputKeyDown}
-                                onBlur={finishEditing}
-                            />
-                            <button onMouseDown={(e) => { e.preventDefault(); finishEditing(); }} className="text-emerald-600 hover:text-emerald-800 p-1"><Check className="w-3 h-3" /></button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-1 group">
-                            <select
-                                value={activeTemplate?.category || 'Other'}
-                                onChange={handleSelectChange}
-                                disabled={!isOwner}
-                                className="text-[10px] uppercase tracking-wider font-medium text-slate-600 bg-slate-100 border-none rounded px-2 py-1 cursor-pointer hover:bg-slate-200 outline-none appearance-none min-w-[100px] disabled:opacity-70 disabled:cursor-not-allowed"
-                            >
-                                {categoryOptions.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-                            {isOwner && (
-                                <button onClick={startEditing} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all"><Pencil className="w-3 h-3" /></button>
-                            )}
-                        </div>
-                    )}
-
-                    <span className="text-slate-300 mx-1">|</span>
-
-                    <input 
-                        type="text"
-                        value={activeTemplate?.subject || ''}
-                        onChange={(e) => updateTemplateInfo('subject', e.target.value)}
-                        placeholder="Subject Line..."
-                        disabled={!isOwner}
-                        className="text-xs text-slate-500 bg-transparent border-none p-0 focus:ring-0 w-48 disabled:opacity-70"
-                    />
-                </div>
+          <div className="flex flex-col min-w-0">
+            {/* ROW 1: NAME + VISIBILITY */}
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={activeTemplate?.name || ''}
+                onChange={(e) => updateTemplateInfo('name', e.target.value)}
+                className="font-bold text-slate-900 text-lg border-none bg-transparent p-0 m-0 h-auto focus:ring-0 placeholder:text-slate-300 w-auto min-w-[150px] truncate"
+                placeholder="Untitled Template"
+                disabled={!isOwner}
+              />
+              <VisibilityToggle isPublic={activeTemplate?.is_public} isOwner={isOwner} onToggle={() => updateTemplateInfo('is_public', activeTemplate?.is_public ? 0 : 1)} />
             </div>
+
+            {/* ROW 2: CATEGORY • SUBJECT */}
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+              
+              {/* RESTORED: Category Selector with Edit Button */}
+              <CategorySelector 
+                value={activeTemplate?.category} 
+                onChange={(val) => updateTemplateInfo('category', val)} 
+                isOwner={isOwner}
+              />
+              
+              <span className="text-slate-300">•</span>
+              
+              <input 
+                type="text"
+                value={activeTemplate?.subject || ''}
+                onChange={(e) => updateTemplateInfo('subject', e.target.value)}
+                placeholder="Add a subject line..."
+                disabled={!isOwner}
+                className="bg-transparent border-none p-0 focus:ring-0 placeholder:text-slate-300 text-xs w-64"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* RIGHT SIDE ACTIONS */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 mr-2">
-            <div className={cn('w-2 h-2 rounded-full', isSaved ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse')} />
-            <span className="text-xs font-medium text-slate-500 hidden sm:inline">{isSaved ? 'Saved' : 'Unsaved'}</span>
+        {/* RIGHT: ACTIONS */}
+        <div className="flex items-center gap-2">
+          <div className="mr-2 flex items-center gap-2" title={isSaved ? "All changes saved" : "Unsaved changes"}>
+             <div className={cn("w-2 h-2 rounded-full transition-colors", isSaved ? "bg-emerald-400" : "bg-amber-400")} />
           </div>
-          <div className="h-6 w-[1px] bg-slate-200"></div>
-          
-          <Button variant="outline" size="sm" onClick={toggleMockData} className={cn('gap-2', showMockData ? 'bg-slate-100 border-slate-300' : '')}>
-            <Settings className="w-3 h-3" /> <span className="hidden sm:inline">{showMockData ? 'Hide Data' : 'Show Data'}</span>
+
+          <div className="h-6 w-[1px] bg-slate-100 mx-1"></div>
+
+          <Button variant="ghost" size="icon" onClick={toggleMockData} className={cn("text-slate-400 hover:text-indigo-600", showMockData && "text-indigo-600 bg-indigo-50")}>
+            <Settings className="w-5 h-5" />
+          </Button>
+
+          <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)} className="text-slate-400 hover:text-indigo-600">
+            <Send className="w-5 h-5" />
           </Button>
 
           <Button 
             onClick={handleSave} 
-            size="sm" 
             disabled={isSaving}
-            className={cn("gap-2 min-w-[100px] text-white transition-all", 
-                isForking ? "bg-indigo-600 hover:bg-indigo-700" : "bg-emerald-600 hover:bg-emerald-700"
+            className={cn(
+                "ml-2 gap-2 text-white font-medium shadow-sm transition-all active:scale-95",
+                isForking ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-900 hover:bg-slate-800"
             )}
           >
-            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isForking ? <Copy className="w-3 h-3" /> : <Save className="w-3 h-3" />}
-            <span>{isSaving ? 'Saving...' : isForking ? 'Fork Copy' : 'Save'}</span>
-          </Button>
-
-          <Button onClick={openSendModal} size="sm" variant="secondary" className="gap-2 border border-slate-200">
-            <Send className="w-3 h-3" /> <span className="hidden sm:inline">Send Test</span>
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isForking ? <Copy className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {isForking ? "Fork" : "Save"}
           </Button>
         </div>
       </div>
 
-      {/* SEND MODAL (Same as before) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Mail className="w-4 h-4 text-indigo-500" /> Send Test Email</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-6">
-              {sendingStatus === 'success' ? (
-                <div className="flex flex-col items-center justify-center py-4 text-center">
-                  <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3"><CheckCircle className="w-6 h-6" /></div>
-                  <h4 className="text-lg font-medium text-slate-900">Email Sent!</h4>
-                </div>
-              ) : (
-                <form onSubmit={handleSendTest} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Recipient Address</label>
-                    <Input placeholder="name@example.com" type="email" required value={testEmail} onChange={(e) => setTestEmail(e.target.value)} className="w-full" autoFocus />
-                  </div>
-                  {sendingStatus === 'error' && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-100">Failed to send email.</div>}
-                  <div className="pt-2 flex gap-3">
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)} disabled={sendingStatus === 'sending'}>Cancel</Button>
-                    <Button type="submit" className="flex-1 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={sendingStatus === 'sending' || !testEmail}>
-                        {sendingStatus === 'sending' ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : <><Send className="w-4 h-4" /> Send Now</>}
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <SendTestModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} templateId={activeTemplate?.id} />
     </>
   );
 };
