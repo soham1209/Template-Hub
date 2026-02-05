@@ -1,10 +1,9 @@
-const db = require('../config/db');
+import db from '../config/db.js';
 
 // @desc    Get ALL templates (Public Mode - Everyone sees everything)
 // @route   GET /api/templates
-exports.getTemplates = async (req, res) => {
+export const getTemplates = async (req, res) => {
   try {
-    // REMOVED 'WHERE user_id = ?'
     // Now selecting all templates from the database
     const [rows] = await db.query(
       'SELECT id, name, category, subject, updated_at, user_id FROM templates ORDER BY updated_at DESC'
@@ -19,7 +18,7 @@ exports.getTemplates = async (req, res) => {
 
 // @desc    Get single template by ID
 // @route   GET /api/templates/:id
-exports.getTemplate = async (req, res) => {
+export const getTemplate = async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM templates WHERE id = ?', [req.params.id]);
     
@@ -37,7 +36,7 @@ exports.getTemplate = async (req, res) => {
 
 // @desc    Create a new template
 // @route   POST /api/templates
-exports.createTemplate = async (req, res) => {
+export const createTemplate = async (req, res) => {
   try {
     const { name, category, subject, sections } = req.body;
     
@@ -60,7 +59,7 @@ exports.createTemplate = async (req, res) => {
 
 // @desc    Update a template
 // @route   PUT /api/templates/:id
-exports.updateTemplate = async (req, res) => {
+export const updateTemplate = async (req, res) => {
   try {
     const { name, category, subject, sections } = req.body;
     const templateId = req.params.id;
@@ -81,7 +80,7 @@ exports.updateTemplate = async (req, res) => {
 
 // @desc    Delete a template
 // @route   DELETE /api/templates/:id
-exports.deleteTemplate = async (req, res) => {
+export const deleteTemplate = async (req, res) => {
   try {
     await db.query('DELETE FROM templates WHERE id = ?', [req.params.id]);
     res.status(200).json({ message: 'Template deleted' });
@@ -93,11 +92,10 @@ exports.deleteTemplate = async (req, res) => {
 
 // @desc    Get ALL unique categories (Global Search)
 // @route   GET /api/templates/categories
-exports.getAllCategories = async (req, res) => {
+export const getAllCategories = async (req, res) => {
   try {
-    console.log("🔍 Fetching ALL categories (Global Mode)");
+    // console.log("🔍 Fetching ALL categories (Global Mode)");
 
-    // REMOVED 'WHERE user_id = ?'
     // Now searching the entire table for unique categories
     const [rows] = await db.query(
       'SELECT DISTINCT category FROM templates WHERE category IS NOT NULL AND category != ""'
@@ -105,7 +103,7 @@ exports.getAllCategories = async (req, res) => {
     
     const categories = rows.map(row => row.category);
     
-    console.log("✅ Found global categories:", categories);
+    // console.log("✅ Found global categories:", categories);
     
     res.status(200).json(categories);
   } catch (error) {

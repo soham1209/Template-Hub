@@ -1,9 +1,9 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const templateRoutes = require('./routes/templateRoutes');
-const emailRoutes = require('./routes/emailRoutes');
-const authRoutes = require('./routes/authRoutes');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import templateRoutes from './routes/templateRoutes.js';
+import emailRoutes from './routes/emailRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
