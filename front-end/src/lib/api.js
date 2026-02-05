@@ -1,4 +1,3 @@
-// front-end/src/lib/api.js
 const API_URL = 'http://localhost:5000/api';
 
 // Helper to get token from storage
@@ -6,13 +5,12 @@ const getHeaders = () => {
   const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
-    // Attach the token if it exists
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
 export const api = {
-  // Get all templates for the logged-in user
+  // Get all templates (My + Community)
   getTemplates: async () => {
     const res = await fetch(`${API_URL}/templates`, {
       headers: getHeaders(),
@@ -41,7 +39,7 @@ export const api = {
     return res.json();
   },
 
-  // Save/Update a template
+  // Save/Update a template (Handles Forking too)
   saveTemplate: async (id, data) => {
     const res = await fetch(`${API_URL}/templates/${id}`, {
       method: 'PUT',
@@ -49,6 +47,16 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Failed to save template');
+    return res.json();
+  },
+
+  // Delete Template
+  deleteTemplate: async (id) => {
+    const res = await fetch(`${API_URL}/templates/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to delete template');
     return res.json();
   },
 
@@ -69,16 +77,6 @@ export const api = {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch categories');
-    return res.json();
-  },
-
-  // Delete Template
-  deleteTemplate: async (id) => {
-    const res = await fetch(`${API_URL}/templates/${id}`, {
-        method: 'DELETE',
-        headers: getHeaders(),
-    });
-    if (!res.ok) throw new Error('Failed to delete template');
     return res.json();
   }
 };

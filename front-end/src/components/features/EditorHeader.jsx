@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Settings, CheckCircle, Save, Send, X, Loader2, Mail, ArrowLeft, Pencil, Check 
+  Settings, CheckCircle, Save, Send, X, Loader2, Mail, ArrowLeft, Pencil, Check, Copy, Globe, Lock, Eye
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button, Input } from '../ui';
 import { cn } from '../../lib/utils';
 import useTemplateStore from '../../store/useTemplateStore';
+import useAuthStore from '../../store/useAuthStore';
 import { api } from '../../lib/api';
 
 export const EditorHeader = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const {
     getActiveTemplate,
     updateTemplateInfo,
@@ -21,68 +23,67 @@ export const EditorHeader = () => {
 
   const activeTemplate = getActiveTemplate();
   
-  // --- CATEGORY LOGIC ---
+  // Ownership Check
+  const isOwner = !activeTemplate?.user_id || activeTemplate?.user_id === user?.id;
+  const isForking = activeTemplate?.is_public && !isOwner;
+
+  // Category Logic
   const DEFAULT_CATEGORIES = ['Marketing', 'Newsletter', 'Transactional', 'Holiday', 'Other'];
   const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
 
-  // 1. Fetch categories from backend
   useEffect(() => {
     const loadData = async () => {
       let merged = [...DEFAULT_CATEGORIES];
       try {
         const dbCategories = await api.getCategories();
         merged = [...merged, ...dbCategories];
-      } catch (e) {
-        // Silent fail, use defaults
-      }
-      
-      // Always include current template's category
+      } catch (e) {}
       if (activeTemplate?.category) {
         merged.push(activeTemplate.category);
       }
-
-      // Unique & Sort
       setCategoryOptions(Array.from(new Set(merged)).sort());
     };
     loadData();
   }, [activeTemplate?.id]);
 
-  // 2. Handle Dropdown Change
-  const handleSelectChange = (e) => {
-    updateTemplateInfo('category', e.target.value);
-  };
-
-  // 3. Handle "Edit" Click
+  const handleSelectChange = (e) => updateTemplateInfo('category', e.target.value);
+  
   const startEditing = () => {
     setIsEditing(true);
-    // Wait for render then focus
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  // 4. Handle "Save" (Enter key or Check button)
   const finishEditing = () => {
-    const val = activeTemplate.category.trim();
-    if (!val) {
-      updateTemplateInfo('category', 'Other'); // Fallback
-    } else {
-      // Add to list visually so it appears in dropdown immediately
-      setCategoryOptions(prev => Array.from(new Set([...prev, val])).sort());
-    }
+    const val = activeTemplate?.category?.trim();
+    if (!val) updateTemplateInfo('category', 'Other');
+    else setCategoryOptions(prev => Array.from(new Set([...prev, val])).sort());
     setIsEditing(false);
   };
 
-  const handleInputKeyDown = (e) => {
-    if (e.key === 'Enter') finishEditing();
+  const handleInputKeyDown = (e) => { if (e.key === 'Enter') finishEditing(); };
+
+  // --- VISIBILITY TOGGLE (New Feature) ---
+  const toggleVisibility = () => {
+    const currentStatus = activeTemplate?.is_public ? 1 : 0;
+    const newStatus = currentStatus === 1 ? 0 : 1; // Flip it
+    updateTemplateInfo('is_public', newStatus);
   };
 
-  // --- MODAL LOGIC (Unchanged) ---
+  // Save & Fork Logic
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [sendingStatus, setSendingStatus] = useState('idle');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => { setTimeout(() => { saveTemplate(); }, 600); };
+  const handleSave = async () => {
+    setIsSaving(true);
+    const result = await saveTemplate();
+    setIsSaving(false);
+    if (result && result.newId) navigate(`/editor/${result.newId}`);
+  };
+
   const openSendModal = () => { setSendingStatus('idle'); setTestEmail(''); setIsModalOpen(true); };
 
   const handleSendTest = async (e) => {
@@ -105,20 +106,42 @@ export const EditorHeader = () => {
             </Button>
 
             <div className="flex flex-col gap-1">
-                {/* Template Name */}
-                <input
-                    type="text"
-                    value={activeTemplate?.name || ''}
-                    onChange={(e) => updateTemplateInfo('name', e.target.value)}
-                    className="font-semibold text-slate-900 border-none bg-transparent shadow-none px-0 h-6 focus-visible:ring-0 text-sm w-64 placeholder:text-slate-400"
-                    placeholder="Untitled Template"
-                />
+                <div className="flex items-center gap-2">
+                    <input
+                        type="text"
+                        value={activeTemplate?.name || ''}
+                        onChange={(e) => updateTemplateInfo('name', e.target.value)}
+                        className="font-semibold text-slate-900 border-none bg-transparent shadow-none px-0 h-6 focus-visible:ring-0 text-sm w-64 placeholder:text-slate-400"
+                        placeholder="Untitled Template"
+                        disabled={!isOwner} // Disable renaming if not owner
+                    />
+                    
+                    {/* VISIBILITY BADGE / TOGGLE */}
+                    {isOwner ? (
+                        <button 
+                            onClick={toggleVisibility}
+                            className={cn(
+                                "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border transition-all hover:bg-opacity-80",
+                                activeTemplate?.is_public 
+                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" 
+                                    : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                            )}
+                            title={activeTemplate?.is_public ? "Click to make Private" : "Click to make Public"}
+                        >
+                            {activeTemplate?.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                            {activeTemplate?.is_public ? "Public" : "Private"}
+                        </button>
+                    ) : (
+                        // View Only Badge
+                        <span className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-indigo-100">
+                            <Eye className="w-3 h-3" /> Community View
+                        </span>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-2 h-6">
-                    
-                    {/* --- NEW CATEGORY UI: DROPDOWN + EDIT BUTTON --- */}
+                    {/* Category Selection */}
                     {isEditing ? (
-                        // MODE A: EDITING (Input Field)
                         <div className="flex items-center bg-indigo-50 border border-indigo-200 rounded px-1 animate-in fade-in zoom-in duration-200">
                             <input 
                                 ref={inputRef}
@@ -129,35 +152,23 @@ export const EditorHeader = () => {
                                 onKeyDown={handleInputKeyDown}
                                 onBlur={finishEditing}
                             />
-                            <button 
-                                onMouseDown={(e) => { e.preventDefault(); finishEditing(); }} 
-                                className="text-emerald-600 hover:text-emerald-800 p-1"
-                                title="Save Category Name"
-                            >
-                                <Check className="w-3 h-3" />
-                            </button>
+                            <button onMouseDown={(e) => { e.preventDefault(); finishEditing(); }} className="text-emerald-600 hover:text-emerald-800 p-1"><Check className="w-3 h-3" /></button>
                         </div>
                     ) : (
-                        // MODE B: SELECTION (Dropdown + Pencil)
                         <div className="flex items-center gap-1 group">
                             <select
                                 value={activeTemplate?.category || 'Other'}
                                 onChange={handleSelectChange}
-                                className="text-[10px] uppercase tracking-wider font-medium text-slate-600 bg-slate-100 border-none rounded px-2 py-1 cursor-pointer hover:bg-slate-200 outline-none appearance-none min-w-[100px]"
+                                disabled={!isOwner}
+                                className="text-[10px] uppercase tracking-wider font-medium text-slate-600 bg-slate-100 border-none rounded px-2 py-1 cursor-pointer hover:bg-slate-200 outline-none appearance-none min-w-[100px] disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 {categoryOptions.map(cat => (
                                     <option key={cat} value={cat}>{cat}</option>
                                 ))}
                             </select>
-                            
-                            {/* The Edit Button You Requested */}
-                            <button 
-                                onClick={startEditing}
-                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all"
-                                title="Edit Category Name"
-                            >
-                                <Pencil className="w-3 h-3" />
-                            </button>
+                            {isOwner && (
+                                <button onClick={startEditing} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all"><Pencil className="w-3 h-3" /></button>
+                            )}
                         </div>
                     )}
 
@@ -168,7 +179,8 @@ export const EditorHeader = () => {
                         value={activeTemplate?.subject || ''}
                         onChange={(e) => updateTemplateInfo('subject', e.target.value)}
                         placeholder="Subject Line..."
-                        className="text-xs text-slate-500 bg-transparent border-none p-0 focus:ring-0 w-48"
+                        disabled={!isOwner}
+                        className="text-xs text-slate-500 bg-transparent border-none p-0 focus:ring-0 w-48 disabled:opacity-70"
                     />
                 </div>
             </div>
@@ -181,19 +193,30 @@ export const EditorHeader = () => {
             <span className="text-xs font-medium text-slate-500 hidden sm:inline">{isSaved ? 'Saved' : 'Unsaved'}</span>
           </div>
           <div className="h-6 w-[1px] bg-slate-200"></div>
+          
           <Button variant="outline" size="sm" onClick={toggleMockData} className={cn('gap-2', showMockData ? 'bg-slate-100 border-slate-300' : '')}>
             <Settings className="w-3 h-3" /> <span className="hidden sm:inline">{showMockData ? 'Hide Data' : 'Show Data'}</span>
           </Button>
-          <Button onClick={handleSave} size="sm" className="gap-2 min-w-[80px] bg-indigo-600 hover:bg-indigo-700 text-white">
-            {isSaved ? <CheckCircle className="w-3 h-3" /> : <Save className="w-3 h-3" />} <span>{isSaved ? 'Saved' : 'Save'}</span>
+
+          <Button 
+            onClick={handleSave} 
+            size="sm" 
+            disabled={isSaving}
+            className={cn("gap-2 min-w-[100px] text-white transition-all", 
+                isForking ? "bg-indigo-600 hover:bg-indigo-700" : "bg-emerald-600 hover:bg-emerald-700"
+            )}
+          >
+            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isForking ? <Copy className="w-3 h-3" /> : <Save className="w-3 h-3" />}
+            <span>{isSaving ? 'Saving...' : isForking ? 'Fork Copy' : 'Save'}</span>
           </Button>
+
           <Button onClick={openSendModal} size="sm" variant="secondary" className="gap-2 border border-slate-200">
             <Send className="w-3 h-3" /> <span className="hidden sm:inline">Send Test</span>
           </Button>
         </div>
       </div>
 
-      {/* SEND MODAL */}
+      {/* SEND MODAL (Same as before) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">

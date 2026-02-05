@@ -1,4 +1,3 @@
-// Zustand store for managing email templates
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { api } from '../lib/api';
@@ -10,18 +9,18 @@ const useTemplateStore = create(
       // State
       templates: [],
       activeId: null,
-      activeTemplate: null, // We now store the full active template separately
+      activeTemplate: null,
       view: 'dashboard', 
       isSaved: true,
       editorTab: 'structure',
       selectedSectionId: null,
       showMockData: false,
-      isLoading: false, // UI loading state
+      isLoading: false,
       error: null,
 
       // --- ASYNC ACTIONS (API Calls) ---
 
-      // 1. Fetch all templates for Dashboard
+      // 1. Fetch all templates
       fetchTemplates: async () => {
         set({ isLoading: true });
         try {
@@ -33,13 +32,12 @@ const useTemplateStore = create(
         }
       },
 
-      // 2. Load a specific template for Editor
+      // 2. Load a specific template
       loadTemplate: async (id) => {
         set({ isLoading: true, activeId: id, view: 'editor' });
         try {
           const data = await api.getTemplate(id);
-          // MySQL might return 'sections' as a string if not configured perfectly, 
-          // so we double check parsing here just in case.
+          // Parse sections if they come as a string
           if (typeof data.sections === 'string') {
              data.sections = JSON.parse(data.sections);
           }
@@ -55,69 +53,83 @@ const useTemplateStore = create(
         set({ isLoading: true });
         try {
           const newTemplate = {
-            user_id: 1, // Hardcoded for now
             name: 'Untitled Template',
             category: 'Other',
             subject: 'New Subject',
             sections: DEFAULT_SECTIONS,
+            is_public: 0, // Default to private
           };
           
           const result = await api.createTemplate(newTemplate);
           
           // Refresh list and open editor
           await get().fetchTemplates();
-          await get().loadTemplate(result.id);
+          set({ activeId: result.id }); // Set the ID so Dashboard can navigate
         } catch (err) {
           set({ error: 'Failed to create template', isLoading: false });
         }
       },
 
-      // 4. Save the current template to DB
+      // 4. Save Template (Updated for Forking Logic)
       saveTemplate: async () => {
         const { activeTemplate } = get();
         if (!activeTemplate) return;
 
-        set({ isSaved: false }); // Show saving spinner if you have one
+        set({ isSaved: false });
         try {
-          await api.saveTemplate(activeTemplate.id, {
+          // Send all fields including is_public and description
+          const result = await api.saveTemplate(activeTemplate.id, {
             name: activeTemplate.name,
             category: activeTemplate.category,
             subject: activeTemplate.subject,
             sections: activeTemplate.sections,
+            is_public: activeTemplate.is_public, 
+            description: activeTemplate.description
           });
+
           set({ isSaved: true });
+
+          // IMPORTANT: Return the result! 
+          // If the backend created a copy (Fork), EditorHeader needs this 'result' to redirect.
+          return result; 
+
         } catch (err) {
           console.error(err);
           set({ error: 'Failed to save', isSaved: false });
         }
       },
-      // 5 Reorder sections via drag-and-drop
+
+      // 5. Delete Template (THIS WAS MISSING!)
+      deleteTemplate: async (id) => {
+        set({ isLoading: true });
+        try {
+            await api.deleteTemplate(id);
+            // Optimistically remove from UI
+            set((state) => ({
+                templates: state.templates.filter((t) => t.id !== id),
+                isLoading: false
+            }));
+        } catch (err) {
+            console.error(err);
+            set({ error: 'Failed to delete template', isLoading: false });
+        }
+      },
+
+      // --- LOCAL STATE ACTIONS ---
       reorderSection: (fromIndex, toIndex) =>
         set((state) => {
           const sections = [...state.activeTemplate.sections];
           const [movedItem] = sections.splice(fromIndex, 1);
           sections.splice(toIndex, 0, movedItem);
-
-          return {
-            activeTemplate: { ...state.activeTemplate, sections },
-            isSaved: false,
-          };
+          return { activeTemplate: { ...state.activeTemplate, sections }, isSaved: false };
         }),
 
-      // --- LOCAL STATE ACTIONS (Editor manipulations) ---
-      
       setView: (view) => set({ view }),
-      
       setEditorTab: (tab) => set({ editorTab: tab }),
-      
       setSelectedSectionId: (id) => set({ selectedSectionId: id }),
-      
       toggleMockData: () => set((state) => ({ showMockData: !state.showMockData })),
-
-      // Helper to get active template (now returns the state variable)
       getActiveTemplate: () => get().activeTemplate,
 
-      // Helper to get active section
       getActiveSection: () => {
         const state = get();
         return state.selectedSectionId && state.activeTemplate
@@ -125,14 +137,12 @@ const useTemplateStore = create(
           : null;
       },
 
-      // Local Update: Name/Subject (Wait for save button to persist)
       updateTemplateInfo: (key, value) =>
         set((state) => ({
           activeTemplate: { ...state.activeTemplate, [key]: value },
           isSaved: false,
         })),
 
-      // Local Update: Add Section
       addSection: (newSection) =>
         set((state) => {
           if (!state.activeTemplate) return {};
@@ -147,20 +157,15 @@ const useTemplateStore = create(
           };
         }),
 
-      // Local Update: Modify Section
       updateSection: (id, field, key, value) =>
         set((state) => {
             const sections = state.activeTemplate.sections.map((s) => {
             if (s.id !== id) return s;
             return { ...s, [field]: { ...s[field], [key]: value } };
             });
-            return {
-                activeTemplate: { ...state.activeTemplate, sections },
-                isSaved: false,
-            };
+            return { activeTemplate: { ...state.activeTemplate, sections }, isSaved: false };
         }),
 
-      // Local Update: Delete Section
       deleteSection: (id) =>
         set((state) => ({
           activeTemplate: {
@@ -171,7 +176,6 @@ const useTemplateStore = create(
           isSaved: false,
         })),
 
-      // Local Update: Move Section
       moveSection: (index, direction) =>
         set((state) => {
           const sections = [...state.activeTemplate.sections];
@@ -181,11 +185,7 @@ const useTemplateStore = create(
           const temp = sections[index];
           sections[index] = sections[index + direction];
           sections[index + direction] = temp;
-
-          return {
-            activeTemplate: { ...state.activeTemplate, sections },
-            isSaved: false,
-          };
+          return { activeTemplate: { ...state.activeTemplate, sections }, isSaved: false };
         }),
     }),
     { name: 'TemplateStore' }
