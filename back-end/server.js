@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const templateRoutes = require('./routes/templateRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 dotenv.config();
 
@@ -12,6 +13,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors()); // Allow requests from your React Frontend
 app.use(express.json()); // Parse JSON bodies
+app.use('/api/auth', authRoutes);
 
 
 // Routes

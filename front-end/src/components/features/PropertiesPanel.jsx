@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Settings as SettingsIcon,
-  X,
+  ArrowLeft, // Changed from X to ArrowLeft
   ImageIcon,
   Type,
   LayoutList,
@@ -19,7 +19,8 @@ import useTemplateStore from '../../store/useTemplateStore';
  * Edit properties of the selected section
  */
 export const PropertiesPanel = () => {
-  const { getActiveSection, setSelectedSectionId, updateSection } = useTemplateStore();
+  // Add setEditorTab to the store hook
+  const { getActiveSection, setEditorTab, updateSection } = useTemplateStore();
   const activeSection = getActiveSection();
 
   if (!activeSection) {
@@ -33,32 +34,41 @@ export const PropertiesPanel = () => {
 
   const getIcon = () => {
     switch (activeSection.type) {
-      case BLOCK_TYPES.IMAGE:
-        return <ImageIcon className="w-4 h-4" />;
-      case BLOCK_TYPES.TEXT:
-        return <Type className="w-4 h-4" />;
-      case BLOCK_TYPES.HEADER:
-        return <LayoutList className="w-4 h-4" />;
-      case BLOCK_TYPES.BUTTON:
-        return <PlayCircle className="w-4 h-4" />;
-      case BLOCK_TYPES.FOOTER:
-        return <Tag className="w-4 h-4" />;
-      default:
-        return <SettingsIcon className="w-4 h-4" />;
+      case BLOCK_TYPES.IMAGE: return <ImageIcon className="w-4 h-4" />;
+      case BLOCK_TYPES.TEXT: return <Type className="w-4 h-4" />;
+      case BLOCK_TYPES.HEADER: return <LayoutList className="w-4 h-4" />;
+      case BLOCK_TYPES.BUTTON: return <PlayCircle className="w-4 h-4" />;
+      case BLOCK_TYPES.FOOTER: return <Tag className="w-4 h-4" />;
+      default: return <SettingsIcon className="w-4 h-4" />;
     }
+  };
+
+  // Logic to go back to structure tab
+  const handleBack = () => {
+    setEditorTab('structure');
   };
 
   return (
     <div className="p-6 space-y-8 animate-in slide-in-from-right-4 duration-300">
-      {/* Header */}
+      {/* Header with Back Button */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-        <div className="flex items-center gap-2 text-slate-800">
-          <div className="p-2 bg-slate-100 rounded-md">{getIcon()}</div>
-          <span className="font-semibold capitalize text-sm">{activeSection.type} Block</span>
+        <div className="flex items-center gap-3 text-slate-800">
+          {/* Back Button */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleBack}
+            className="h-8 w-8 -ml-2 text-slate-400 hover:text-slate-900"
+            title="Back to Structure"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-slate-100 rounded-md">{getIcon()}</div>
+            <span className="font-semibold capitalize text-sm">{activeSection.type}</span>
+          </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setSelectedSectionId(null)}>
-          <X className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* Content Section */}

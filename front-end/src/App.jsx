@@ -1,20 +1,28 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { Dashboard, Editor } from './components/features';
-import useTemplateStore from './store/useTemplateStore';
+import { Login } from './components/auth/Login';
+import { Signup } from './components/auth/Signup';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import './App.css';
 
-/**
- * Main App Component
- * Routes between Dashboard and Editor views
- */
 function App() {
-  const { view } = useTemplateStore();
-
   return (
-    <div className="flex h-screen w-full bg-slate-50 text-slate-950 font-sans overflow-hidden">
-      {view === 'dashboard' && <Dashboard />}
-      {view === 'editor' && <Editor />}
-    </div>
+    <BrowserRouter>
+      <div className="h-screen w-full bg-slate-50 text-slate-950 font-sans">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/editor/:templateId" element={<Editor />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }
 
